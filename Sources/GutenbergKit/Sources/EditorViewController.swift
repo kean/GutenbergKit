@@ -29,6 +29,8 @@ public final class EditorViewController: UIViewController, GutenbergEditorContro
 
     /// A custom URL for the editor.
     public var editorURL: URL?
+    /// Hide the editor chrome from accessibility tools
+    public var dialogVisible: Binding<Bool>?
 
     private var cancellables: [AnyCancellable] = []
 
@@ -180,6 +182,10 @@ public final class EditorViewController: UIViewController, GutenbergEditorContro
         let host = UIHostingController(rootView: view)
         present(host, animated: true)
     }
+    
+    private func toggleDialogVisibility(visible: Bool) {
+        dialogVisible?.wrappedValue = visible
+    }
 
     // MARK: - Internal (Initial Content)
 
@@ -221,6 +227,9 @@ public final class EditorViewController: UIViewController, GutenbergEditorContro
                 delegate?.editor(self, didUpdateContentWithState: state)
             case .showBlockPicker:
                 showBlockInserter()
+            case .onToggleDialogVisibility:
+                let body = try message.decode(EditorJSMessage.DidToggleDialogVisibility.self)
+                toggleDialogVisibility(visible: body.visible)
             }
         } catch {
             fatalError("failed to decode message: \(error)")

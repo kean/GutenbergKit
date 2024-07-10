@@ -27,6 +27,9 @@ const EditorToolbar = (props) => {
 		document
 			.getElementById('canvas')
 			.setAttribute('aria-hidden', !isBlockInspectorShown);
+		postMessage('onToggleDialogVisibility', {
+			visible: !isBlockInspectorShown,
+		});
 	};
 
 	return (
