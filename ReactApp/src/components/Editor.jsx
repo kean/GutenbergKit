@@ -104,7 +104,7 @@ function Editor() {
 			settings={settings}
 		>
 			<BlockTools>
-				<div className="editor-styles-wrapper">
+				<div id="canvas" className="editor-styles-wrapper">
 					<BlockEditorKeyboardShortcuts.Register />
 					<WritingFlow>
 						<ObserveTyping>
