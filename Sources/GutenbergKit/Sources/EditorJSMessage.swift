@@ -29,9 +29,15 @@ struct EditorJSMessage {
         case onBlocksChanged
         /// The user tapped the inserter button.
         case showBlockPicker
+        /// Hide the editor chrome from accessibility tools
+        case onToggleDialogVisibility
     }
 
     struct DidUpdateBlocksBody: Decodable {
         let isEmpty: Bool
+    }
+    
+    struct DidToggleDialogVisibility: Decodable {
+        let visible: Bool
     }
 }
