@@ -40,6 +40,67 @@ function Editor() {
 	const [registeredBlocks, setRegisteredBlocks] = useState([]);
 	const [isCodeEditorEnabled, setCodeEditorEnabled] = useState(false);
 
+	useEffect(() => {
+		let isCurrent = true;
+
+		const fetchData = async () => {
+			try {
+				const response = await fetch(
+					'http://localhost:8881/?rest_route=/wp/v2/block-types/jetpack',
+					{
+						headers: {
+							Authorization: 'Basic <token>',
+						},
+					}
+				);
+				const data = await response.json();
+				if (!isCurrent) {
+					return;
+				}
+				console.log('>>> fetched block types:', data);
+				data.forEach((block) => {
+					registerBlockType(block.name, block);
+				});
+				appendStylesAndScripts(data);
+			} catch (error) {
+				console.error('Error fetching block types:', error);
+			}
+		};
+
+		fetchData();
+
+		return () => {
+			isCurrent = false;
+			getBlockTypes().forEach((block) => {
+				unregisterBlockType(block.name);
+			});
+		};
+	}, []);
+
+	function appendStylesAndScripts(blockTypes) {
+		const styles = blockTypes
+			.flatMap((block) => block.style_paths)
+			.filter((style) => style);
+		const scripts = blockTypes
+			.flatMap((block) => block.script_paths)
+			.filter((script) => script);
+
+		console.log('>>>', { styles, scripts });
+
+		styles.forEach((style) => {
+			const link = document.createElement('link');
+			link.rel = 'stylesheet';
+			link.href = style;
+			document.head.appendChild(link);
+		});
+
+		scripts.forEach((script) => {
+			const scriptTag = document.createElement('script');
+			scriptTag.src = script;
+			document.body.appendChild(scriptTag);
+		});
+	}
+
 	function didChangeBlocks(blocks) {
 		setBlocks(blocks);
 
