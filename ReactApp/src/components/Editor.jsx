@@ -12,7 +12,13 @@ import {
 import { Popover } from '@wordpress/components';
 import { getBlockTypes, unregisterBlockType } from '@wordpress/blocks';
 import { registerCoreBlocks } from '@wordpress/block-library';
-import { parse, serialize, registerBlockType } from '@wordpress/blocks';
+import {
+	parse,
+	serialize,
+	registerBlockType,
+	store as blockStore,
+} from '@wordpress/blocks';
+import { dispatch } from '@wordpress/data';
 
 // Default styles that are needed for the editor.
 import '@wordpress/components/build-style/style.css';
@@ -46,23 +52,27 @@ function Editor() {
 		const fetchData = async () => {
 			try {
 				const response = await fetch(
-					'http://localhost:8881/?rest_route=/wp/v2/block-types/jetpack',
+					'http://localhost:8888/?rest_route=/wp-block-editor/v1/settings',
 					{
 						headers: {
-							Authorization: 'Basic <token>',
+							Authorization: 'Basic [REDACTED]',
 						},
 					}
 				);
-				const data = await response.json();
+				const { __unstableResolvedAssets } = await response.json();
 				if (!isCurrent) {
 					return;
 				}
-				console.log('>>> fetched block types:', data);
-				data.forEach((block) => {
-					registerBlockType(block.name, block);
-				});
-				appendStylesAndScripts(data);
+				const { styles, scripts } = __unstableResolvedAssets;
+				document.head.insertAdjacentHTML('beforeend', styles);
+				document.head.insertAdjacentHTML('beforeend', scripts);
+				window.editor = editor;
+				registerCoreBlocks();
+				dispatch(blockStore).reapplyBlockTypeFilters();
+				postMessage('onEditorLoaded');
+				console.log('>>>> [Settings] DONE', { styles, scripts });
 			} catch (error) {
+				console.log('>>>> [Settings] FAIL');
 				console.error('Error fetching block types:', error);
 			}
 		};
@@ -70,36 +80,11 @@ function Editor() {
 		fetchData();
 
 		return () => {
+			console.log('>>>> [Settings] CLEAN');
+			window.editor = {};
 			isCurrent = false;
-			getBlockTypes().forEach((block) => {
-				unregisterBlockType(block.name);
-			});
 		};
 	}, []);
-
-	function appendStylesAndScripts(blockTypes) {
-		const styles = blockTypes
-			.flatMap((block) => block.style_paths)
-			.filter((style) => style);
-		const scripts = blockTypes
-			.flatMap((block) => block.script_paths)
-			.filter((script) => script);
-
-		console.log('>>>', { styles, scripts });
-
-		styles.forEach((style) => {
-			const link = document.createElement('link');
-			link.rel = 'stylesheet';
-			link.href = style;
-			document.head.appendChild(link);
-		});
-
-		scripts.forEach((script) => {
-			const scriptTag = document.createElement('script');
-			scriptTag.src = script;
-			document.body.appendChild(scriptTag);
-		});
-	}
 
 	function didChangeBlocks(blocks) {
 		setBlocks(blocks);
@@ -135,18 +120,18 @@ function Editor() {
 		// }
 	};
 
-	useEffect(() => {
-		window.editor = editor;
-		registerCoreBlocks();
-		postMessage('onEditorLoaded');
+	// useEffect(() => {
+	// 	window.editor = editor;
+	// 	registerCoreBlocks();
+	// 	// postMessage('onEditorLoaded');
 
-		return () => {
-			window.editor = {};
-			getBlockTypes().forEach((block) => {
-				unregisterBlockType(block.name);
-			});
-		};
-	}, []);
+	// 	return () => {
+	// 		window.editor = {};
+	// 		// getBlockTypes().forEach((block) => {
+	// 		// 	unregisterBlockType(block.name);
+	// 		// });
+	// 	};
+	// }, []);
 
 	const settings = {
 		hasFixedToolbar: true,
