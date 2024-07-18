@@ -3313,5 +3313,17 @@
 				display: block !important;
 			}
 		</style>
+		<!--
+		 Jetpack does not properly register/enqueue the following asset, which means
+		 it is not returned by the iframe asset utility. Gutenberg warns about this
+		 and manually copies the asset to the iframe.
+		 https://github.com/WordPress/gutenberg/blob/0a7e10db2037cb80e4ab8cda4363ba18d6a3a83f/packages/block-editor/src/components/iframe/index.js#L166-L182
+		 -->
+		<link
+			rel="stylesheet"
+			id="jetpack-blocks-editor-css"
+			href="http://localhost:8881/wp-content/plugins/jetpack/_inc/blocks/editor.css?minify=false&amp;ver=f5e4b300f61c14dc92be"
+			media="all"
+		/>
 	</body>
 </html>

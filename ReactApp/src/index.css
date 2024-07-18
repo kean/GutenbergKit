@@ -46,6 +46,7 @@ h4 {
 }
 
 .editor-styles-wrapper li {
+	/* TODO(David): The following breaks various block styles, e.g. Jetpack sharing button size */
 	font-size: 17px;
 	margin-bottom: 5px;
 }
