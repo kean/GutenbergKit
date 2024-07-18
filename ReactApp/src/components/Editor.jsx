@@ -52,7 +52,7 @@ function Editor() {
 		const fetchData = async () => {
 			try {
 				const response = await fetch(
-					'http://localhost:8888/?rest_route=/wp-block-editor/v1/settings',
+					'http://localhost:8881/?rest_route=/wp-block-editor/v1/settings',
 					{
 						headers: {
 							Authorization: 'Basic [REDACTED]',
