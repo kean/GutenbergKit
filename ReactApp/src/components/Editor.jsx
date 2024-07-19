@@ -52,27 +52,18 @@ function Editor() {
 		const fetchData = async () => {
 			try {
 				const response = await fetch(
-					'http://localhost:8881/?rest_route=/wp-block-editor/v1/settings',
-					{
-						headers: {
-							Authorization: 'Basic [REDACTED]',
-						},
-					}
+					'http://localhost:8882/?rest_route=/beae/v1/editor-assets'
 				);
-				const { __unstableResolvedAssets } = await response.json();
 				if (!isCurrent) {
 					return;
 				}
-				const { styles, scripts } = __unstableResolvedAssets;
+				const { styles, scripts } = await response.json();
 				document.head.insertAdjacentHTML('beforeend', styles);
 				document.head.insertAdjacentHTML('beforeend', scripts);
 				window.editor = editor;
 				registerCoreBlocks();
-				dispatch(blockStore).reapplyBlockTypeFilters();
 				postMessage('onEditorLoaded');
-				console.log('>>>> [Settings] DONE', { styles, scripts });
 			} catch (error) {
-				console.log('>>>> [Settings] FAIL');
 				console.error('Error fetching block types:', error);
 			}
 		};
@@ -80,7 +71,6 @@ function Editor() {
 		fetchData();
 
 		return () => {
-			console.log('>>>> [Settings] CLEAN');
 			window.editor = {};
 			isCurrent = false;
 		};
