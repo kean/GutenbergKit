@@ -97,7 +97,7 @@ function Editor() {
 		const fetchData = async () => {
 			try {
 				const response = await fetch(
-					'http://localhost:8881/?rest_route=/wp/v2/block-types/jetpack',
+					'http://localhost:8882/?rest_route=/wp/v2/block-types',
 					{
 						headers: {
 							Authorization: 'Basic <token>',
@@ -109,9 +109,9 @@ function Editor() {
 					return;
 				}
 				console.log('>>> fetched block types:', data);
-				data.forEach((block) => {
-					registerBlockType(block.name, block);
-				});
+				// data.forEach((block) => {
+				// 	registerBlockType(block.name, block);
+				// });
 				appendStylesAndScripts(data);
 			} catch (error) {
 				console.error('Error fetching block types:', error);
@@ -122,19 +122,33 @@ function Editor() {
 
 		return () => {
 			isCurrent = false;
-			getBlockTypes().forEach((block) => {
-				unregisterBlockType(block.name);
-			});
+			// getBlockTypes().forEach((block) => {
+			// 	unregisterBlockType(block.name);
+			// });
 		};
 	}, []);
 
 	function appendStylesAndScripts(blockTypes) {
-		const styles = blockTypes
-			.flatMap((block) => block.style_paths)
-			.filter((style) => style);
-		const scripts = blockTypes
-			.flatMap((block) => block.script_paths)
-			.filter((script) => script);
+		const styles = [
+			...new Set(
+				blockTypes
+					.flatMap((block) => [
+						...block.editor_style_paths,
+						...block.style_paths,
+					])
+					.filter((style) => style)
+			),
+		];
+		const scripts = [
+			...new Set(
+				blockTypes
+					.flatMap((block) => [
+						...block.editor_script_paths,
+						...block.script_paths,
+					])
+					.filter((script) => script)
+			),
+		];
 
 		console.log('>>>', { styles, scripts });
 
