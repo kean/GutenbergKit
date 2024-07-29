@@ -1,25 +1,5 @@
 import { useEffect, useState } from 'react';
 
-// WordPress
-import {
-	BlockEditorKeyboardShortcuts,
-	BlockEditorProvider,
-	BlockList,
-	BlockTools,
-	WritingFlow,
-	ObserveTyping,
-} from '@wordpress/block-editor';
-import { Popover } from '@wordpress/components';
-import { getBlockTypes, unregisterBlockType } from '@wordpress/blocks';
-import { registerCoreBlocks } from '@wordpress/block-library';
-import {
-	parse,
-	serialize,
-	registerBlockType,
-	store as blockStore,
-} from '@wordpress/blocks';
-import { dispatch } from '@wordpress/data';
-
 // Default styles that are needed for the editor.
 import '@wordpress/components/build-style/style.css';
 import '@wordpress/block-editor/build-style/style.css';
@@ -38,6 +18,19 @@ import EditorToolbar from './EditorToolbar';
 import { postMessage } from '../misc/Helpers';
 // import CodeEditor from './CodeEditor';
 
+// Rely upon WordPress globals to ensure a shared block registry.
+const {
+	BlockEditorKeyboardShortcuts,
+	BlockEditorProvider,
+	BlockList,
+	BlockTools,
+	WritingFlow,
+	ObserveTyping,
+} = window.wp.blockEditor;
+const { Popover } = window.wp.components;
+const { getBlockTypes, unregisterBlockType } = window.wp.blocks;
+const { parse, serialize } = window.wp.blocks;
+
 // Current editor (assumes can be only one instance).
 let editor = {};
 
@@ -45,36 +38,6 @@ function Editor() {
 	const [blocks, setBlocks] = useState([]);
 	const [registeredBlocks, setRegisteredBlocks] = useState([]);
 	const [isCodeEditorEnabled, setCodeEditorEnabled] = useState(false);
-
-	useEffect(() => {
-		let isCurrent = true;
-
-		const fetchData = async () => {
-			try {
-				const response = await fetch(
-					'http://localhost:8882/?rest_route=/beae/v1/editor-assets'
-				);
-				if (!isCurrent) {
-					return;
-				}
-				const { styles, scripts } = await response.json();
-				document.head.insertAdjacentHTML('beforeend', styles);
-				document.head.insertAdjacentHTML('beforeend', scripts);
-				window.editor = editor;
-				registerCoreBlocks();
-				postMessage('onEditorLoaded');
-			} catch (error) {
-				console.error('Error fetching block types:', error);
-			}
-		};
-
-		fetchData();
-
-		return () => {
-			window.editor = {};
-			isCurrent = false;
-		};
-	}, []);
 
 	function didChangeBlocks(blocks) {
 		setBlocks(blocks);
@@ -110,18 +73,20 @@ function Editor() {
 		// }
 	};
 
-	// useEffect(() => {
-	// 	window.editor = editor;
-	// 	registerCoreBlocks();
-	// 	// postMessage('onEditorLoaded');
+	useEffect(() => {
+		window.editor = editor;
+		window.wp.blockLibrary.registerCoreBlocks();
+		postMessage('onEditorLoaded');
 
-	// 	return () => {
-	// 		window.editor = {};
-	// 		// getBlockTypes().forEach((block) => {
-	// 		// 	unregisterBlockType(block.name);
-	// 		// });
-	// 	};
-	// }, []);
+		return () => {
+			window.editor = {};
+			getBlockTypes().forEach((blockType) => {
+				if (blockType.name.startsWith('core/')) {
+					unregisterBlockType(blockType.name);
+				}
+			});
+		};
+	}, []);
 
 	const settings = {
 		hasFixedToolbar: true,
