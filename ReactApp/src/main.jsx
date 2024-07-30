@@ -1,56 +1,4 @@
-import React from 'react';
-import ReactDOM from 'react-dom/client';
 import './index.css';
-import * as react from 'react';
-import * as reactDom from 'react-dom';
-import * as wpBlocks from '@wordpress/blocks';
-import * as wpElement from '@wordpress/element';
-import * as wpPrimitives from '@wordpress/primitives';
-import * as wpCompose from '@wordpress/compose';
-import * as wpData from '@wordpress/data';
-import * as wpBlockEditor from '@wordpress/block-editor';
-import * as wpBlockLibrary from '@wordpress/block-library';
-import * as wpI18n from '@wordpress/i18n';
-import * as wpComponents from '@wordpress/components';
-import * as wpHooks from '@wordpress/hooks';
-import * as wpUrl from '@wordpress/url';
-import * as wpEditSite from '@wordpress/edit-site';
-import apiFetch from '@wordpress/api-fetch';
-import * as wpDate from '@wordpress/date';
-import domReady from '@wordpress/dom-ready';
-import * as wpPlugins from '@wordpress/plugins';
-import * as wpViewport from '@wordpress/viewport';
-import * as wpRichText from '@wordpress/rich-text';
-import * as wpEditor from '@wordpress/editor';
-import * as wpCoreData from '@wordpress/core-data';
-import * as wpBlob from '@wordpress/blob';
-import TokenList from '@wordpress/token-list';
-
-window.wp = window.wp || {};
-window.wp.blocks = wpBlocks;
-window.wp.element = wpElement;
-window.wp.primitives = wpPrimitives;
-window.wp.compose = wpCompose;
-window.wp.data = wpData;
-window.wp.blockEditor = wpBlockEditor;
-window.wp.blockLibrary = wpBlockLibrary;
-window.wp.i18n = wpI18n;
-window.wp.components = wpComponents;
-window.wp.hooks = wpHooks;
-window.wp.url = wpUrl;
-window.wp.editSite = wpEditSite;
-window.wp.apiFetch = apiFetch;
-window.wp.date = wpDate;
-window.wp.domReady = domReady;
-window.wp.plugins = wpPlugins;
-window.wp.viewport = wpViewport;
-window.wp.richText = wpRichText;
-window.wp.editor = wpEditor;
-window.wp.coreData = wpCoreData;
-window.wp.tokenList = TokenList;
-window.wp.blob = wpBlob;
-window.React = react;
-window.ReactDOM = reactDom;
 
 function injectStyles(styles) {
 	const styleContainer = document.createElement('div');
@@ -117,8 +65,9 @@ const fetchData = async () => {
 
 fetchData().then(() => {
 	// Defer loading App until WP globals are defined and third-party scripts are loaded
+	const { React } = window;
 	import('./App.jsx').then(({ default: App }) => {
-		ReactDOM.createRoot(document.getElementById('root')).render(
+		window.ReactDOM.createRoot(document.getElementById('root')).render(
 			<React.StrictMode>
 				<App />
 			</React.StrictMode>

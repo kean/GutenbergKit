@@ -1,5 +1,3 @@
-import { useEffect, useState } from 'react';
-
 // Default styles that are needed for the editor.
 import '@wordpress/components/build-style/style.css';
 import '@wordpress/block-editor/build-style/style.css';
@@ -10,7 +8,6 @@ import '@wordpress/block-library/build-style/editor.css';
 import '@wordpress/block-library/build-style/theme.css';
 
 // Registers standard formatting options for RichText.
-import '@wordpress/format-library';
 import '@wordpress/format-library/build-style/style.css';
 
 // Internal imports
@@ -19,6 +16,7 @@ import { postMessage } from '../misc/Helpers';
 // import CodeEditor from './CodeEditor';
 
 // Rely upon WordPress globals to ensure a shared block registry.
+const { useEffect, useState } = window.wp.element;
 const {
 	BlockEditorKeyboardShortcuts,
 	BlockEditorProvider,
