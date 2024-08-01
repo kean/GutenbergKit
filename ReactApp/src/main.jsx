@@ -2,13 +2,15 @@ import './index.css';
 
 function injectStyles(styles) {
 	const styleContainer = document.createElement('div');
-	styleContainer.innerHTML = styles;
+	styleContainer.innerHTML = styles.replace(/(href=['"])\/\//g, '$1https://');
 	document.head.appendChild(styleContainer);
 }
 
 function injectScripts(scripts) {
 	const scriptContainer = document.createElement('div');
-	const sanitizedScripts = scripts.replace(/\\"/g, "'");
+	const sanitizedScripts = scripts
+		.replace(/\\"/g, "'")
+		.replace(/src="\/\//g, 'src="https://');
 	scriptContainer.innerHTML = sanitizedScripts;
 	const scriptTags = Array.from(scriptContainer.querySelectorAll('script'));
 
