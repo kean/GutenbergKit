@@ -52,10 +52,24 @@ function injectScripts(scripts) {
 	return loadScript(0);
 }
 
+window.GBKit = window.GBKit || JSON.parse(localStorage.getItem('GBKit')) || {};
+
 const fetchData = async () => {
+	const { siteUrl, apiToken } = window.GBKit;
+	if (!siteUrl) {
+		console.error('GBKit siteUrl not defined');
+		return;
+	}
+
 	try {
 		const response = await fetch(
-			'http://localhost:8881/?rest_route=/beae/v1/editor-assets'
+			`${siteUrl}/wp-json/beae/v1/editor-assets`,
+			{
+				headers: {
+					'Content-Type': 'application/json',
+					Authorization: `Bearer ${apiToken}`,
+				},
+			}
 		);
 		const { styles, scripts } = await response.json();
 		injectStyles(styles);
