@@ -1,10 +1,25 @@
+import apiFetch from '@wordpress/api-fetch';
 import './index.css';
+
+window.wp = window.wp || {};
+window.wp.apiFetch = apiFetch;
 
 function injectStyles(styles) {
 	const styleContainer = document.createElement('div');
 	styleContainer.innerHTML = styles.replace(/(href=['"])\/\//g, '$1https://');
 	document.head.appendChild(styleContainer);
 }
+
+// Discard remote copies of preloaded Gutenberg packages to avoid conflicts
+const preloadedGutenbergPackages = ['api-fetch'];
+const excludedScripts = new RegExp(
+	preloadedGutenbergPackages
+		.map(
+			(script) =>
+				`wp-content/plugins/gutenberg/build/${script.replace(/\//g, '\\/')}\\b`
+		)
+		.join('|')
+);
 
 function injectScripts(scripts) {
 	const scriptContainer = document.createElement('div');
@@ -19,6 +34,11 @@ function injectScripts(scripts) {
 
 		return new Promise((resolve) => {
 			const scriptTag = scriptTags[index];
+
+			if (scriptTag.src && excludedScripts.test(scriptTag.src)) {
+				return resolve();
+			}
+
 			const newScript = document.createElement('script');
 
 			if (scriptTag.src) {
@@ -53,24 +73,29 @@ function injectScripts(scripts) {
 }
 
 window.GBKit = window.GBKit || JSON.parse(localStorage.getItem('GBKit')) || {};
+const { siteUrl } = window.GBKit;
+if (!siteUrl) {
+	console.error('GBKit siteUrl not defined');
+}
+
+apiFetch.use(apiFetch.createRootURLMiddleware(`${siteUrl}/wp-json/`));
+apiFetch.setFetchHandler(fetchHandler);
+
+function fetchHandler(options) {
+	const { apiToken } = window.GBKit;
+	const { path, url, ...rest } = options;
+
+	return fetch(url || path, {
+		...rest,
+		headers: {
+			Authorization: `Bearer ${apiToken}`,
+		},
+	});
+}
 
 const fetchData = async () => {
-	const { siteUrl, apiToken } = window.GBKit;
-	if (!siteUrl) {
-		console.error('GBKit siteUrl not defined');
-		return;
-	}
-
 	try {
-		const response = await fetch(
-			`${siteUrl}/wp-json/beae/v1/editor-assets`,
-			{
-				headers: {
-					'Content-Type': 'application/json',
-					Authorization: `Bearer ${apiToken}`,
-				},
-			}
-		);
+		const response = await apiFetch({ path: '/beae/v1/editor-assets' });
 		const { styles, scripts } = await response.json();
 		injectStyles(styles);
 		await injectScripts(scripts);
