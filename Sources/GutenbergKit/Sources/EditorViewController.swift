@@ -89,6 +89,11 @@ public final class EditorViewController: UIViewController, GutenbergEditorContro
 //
 //        }.store(in: &cancellables)
 
+        // Delay the swizzling to ensure all subviews are initialized
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            self.webView.hideKeyboardShortcutBar()
+        }
+
         loadEditor()
     }
 
@@ -213,6 +218,9 @@ public final class EditorViewController: UIViewController, GutenbergEditorContro
     fileprivate func controller(_ controller: GutenbergEditorController, didReceiveMessage message: EditorJSMessage) {
         do {
             switch message.type {
+            case .onLoaded:
+                // Ensure the swizzling is done after the web view has finished loading
+                webView.hideKeyboardShortcutBar()
             case .onEditorLoaded:
                 didLoadEditor()
             case .onBlocksChanged:
@@ -280,6 +288,10 @@ private final class GutenbergEditorController: NSObject, WKNavigationDelegate, W
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         NSLog("navigation: \(String(describing: navigation))")
+        MainActor.assumeIsolated {
+             let message = EditorJSMessage(type: EditorJSMessage.MessageType.onLoaded)
+             delegate?.controller(self, didReceiveMessage: message)
+         }
     }
 
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
@@ -304,4 +316,52 @@ private final class GutenbergEditorController: NSObject, WKNavigationDelegate, W
 
 private extension WKWebView {
 
+}
+
+extension UIView {
+
+    func hideKeyboardShortcutBar() {
+        for subview in self.subviews {
+            subview.hideKeyboardShortcutBar()
+
+            if NSStringFromClass(type(of: subview)) == "WKContentView" {
+                swizzleInputAccessoryView(for: subview)
+            }
+        }
+    }
+
+    private func swizzleInputAccessoryView(for view: UIView) {
+        let originalSelector = #selector(getter: UIResponder.inputAccessoryView)
+        let swizzledSelector = #selector(UIResponder.swizzled_inputAccessoryView)
+
+        guard let originalMethod = class_getInstanceMethod(type(of: view), originalSelector),
+              let swizzledMethod = class_getInstanceMethod(UIResponder.self, swizzledSelector) else {
+            return
+        }
+
+        let didAddMethod = class_addMethod(type(of: view),
+                                           originalSelector,
+                                           method_getImplementation(swizzledMethod),
+                                           method_getTypeEncoding(swizzledMethod))
+
+        if didAddMethod {
+            class_replaceMethod(type(of: view),
+                                swizzledSelector,
+                                method_getImplementation(originalMethod),
+                                method_getTypeEncoding(originalMethod))
+        } else {
+            method_exchangeImplementations(originalMethod, swizzledMethod)
+        }
+    }
+}
+
+extension UIResponder {
+
+    @objc func swizzled_inputAccessoryView() -> UIView? {
+        if let inputAssistantItem = self.perform(NSSelectorFromString("inputAssistantItem"))?.takeUnretainedValue() as? UITextInputAssistantItem {
+            inputAssistantItem.leadingBarButtonGroups = []
+            inputAssistantItem.trailingBarButtonGroups = []
+        }
+        return nil
+    }
 }
