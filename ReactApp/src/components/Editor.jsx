@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 
 // WordPress
 import {
@@ -39,6 +39,40 @@ function Editor() {
 	const [blocks, setBlocks] = useState([]);
 	const [registeredBlocks, setRegisteredBlocks] = useState([]);
 	const [isCodeEditorEnabled, setCodeEditorEnabled] = useState(false);
+	const scrollRef = useRef({
+		lastScrollTop: 0,
+		lastScrollTime: Date.now(),
+	});
+
+	// Dismiss virtual keyboard when scrolling quickly or over long distances.
+	// This rudimentary implementation needs a lot of improvements.
+	useEffect(() => {
+		const scrollEl = document.scrollingElement;
+
+		function onScroll() {
+			const { lastScrollTop, lastScrollTime } = scrollRef.current;
+			const scrollDistance = Math.abs(scrollEl.scrollTop - lastScrollTop);
+			const scrollSpeed = scrollDistance / (Date.now() - lastScrollTime);
+			const focusedElement = document.activeElement;
+
+			if (focusedElement && (scrollDistance > 100 || scrollSpeed > 2)) {
+				focusedElement.blur();
+			}
+
+			scrollRef.current = {
+				lastScrollTop: scrollEl.scrollTop,
+				lastScrollTime: Date.now(),
+			};
+		}
+
+		if (scrollEl) {
+			document.addEventListener('scroll', onScroll);
+
+			return () => {
+				document.removeEventListener('scroll', onScroll);
+			};
+		}
+	}, []);
 
 	function didChangeBlocks(blocks) {
 		setBlocks(blocks);
