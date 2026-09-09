@@ -72,7 +72,7 @@ final class MediaUploadServer: Sendable {
 
         let uploadServer = MediaUploadServer(server: server, cleanupTask: cleanupTask)
         #if DEBUG
-        countServerStarted(delegate: uploadDelegate)
+        countServerStarted(processor: processor, uploader: uploader)
         #endif
         return uploadServer
     }
@@ -102,7 +102,10 @@ final class MediaUploadServer: Sendable {
     /// overlap across a push or a modal transition; four is not a shape hosts produce.
     private static let liveServerLeakThreshold = 4
 
-    private static func countServerStarted(delegate: (any MediaUploadDelegate)?) {
+    private static func countServerStarted(
+        processor: (any MediaProcessor)?,
+        uploader: (any MediaUploader)?
+    ) {
         let count = censusLock.withLock {
             liveServerCount += 1
             return liveServerCount
@@ -110,15 +113,17 @@ final class MediaUploadServer: Sendable {
 
         guard count >= liveServerLeakThreshold else { return }
 
-        let name = delegate.map { String(describing: type(of: $0)) } ?? "the host's delegate"
+        let name = processor.map { String(describing: type(of: $0)) }
+            ?? uploader.map { String(describing: type(of: $0)) }
+            ?? "the host's media handler"
         Logger.uploadServer.fault(
             """
             \(count, privacy: .public) media upload servers are live, one bound loopback \
             listener each. Editors are leaking: a host that both owns EditorViewController \
-            and is its own media upload delegate (\(name, privacy: .public)) forms a retain \
+            and is its own media handler (\(name, privacy: .public)) forms a retain \
             cycle ARC cannot break, so the editor's deinit never runs. Call \
             EditorViewController.stopMediaHandling() when you are done with the editor, or \
-            keep the delegate a leaf object that doesn't reference the editor.
+            keep the handler a leaf object that doesn't reference the editor.
             """
         )
     }
