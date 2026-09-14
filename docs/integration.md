@@ -244,6 +244,100 @@ val configuration = EditorConfiguration.builder()
     .build()
 ```
 
+## Media Handling
+
+Both platforms let the host transform media before upload (`MediaProcessor`) or take over
+the upload entirely (`MediaUploader`). On iOS they are supplied at init:
+
+```swift
+let editor = EditorViewController(
+    configuration: configuration,
+    mediaProcessor: ResizingProcessor(maxDimension: 2000)
+)
+```
+
+### Don't conform the object that owns the editor
+
+GutenbergKit never hands your handler the editor: every value crossing that boundary is a
+`Sendable` value type — a file URL, a MIME type, a filename, form fields. So a handler can
+only reach the editor if you put it there.
+
+That happens when you conform the object that already holds the editor in order to drive
+it. The editor holds the handler strongly in return, which closes a retain cycle ARC cannot
+break — the editor is never deallocated, and each one strands a bound loopback listener.
+It's the tempting shape, because that object has the site context:
+
+```swift
+// Leaks: coordinator -> editor -> mediaProcessor -> coordinator
+final class PostEditorCoordinator: MediaProcessor {
+    var editor: EditorViewController!
+    init(blog: Blog, configuration: EditorConfiguration) {
+        editor = EditorViewController(configuration: configuration, mediaProcessor: self)
+    }
+}
+```
+
+Use a leaf object instead. Nothing is lost: `processFile` is called off the main actor, so
+it could not have touched your coordinator's state regardless — whatever it needs is
+already separable:
+
+```swift
+final class PostEditorCoordinator {
+    private let editor: EditorViewController
+    init(blog: Blog, configuration: EditorConfiguration) {
+        editor = EditorViewController(
+            configuration: configuration,
+            mediaProcessor: BlogMediaProcessor(siteID: blog.dotComID, maxDimension: 2000)
+        )
+    }
+}
+```
+
+If your design genuinely requires the retaining shape, call `stopMediaHandling()` when you
+are finished with the editor. It is terminal — the editor cannot upload or delete media
+afterwards — so call it when the editor is going away, not when it is merely covered or
+backgrounded.
+
+### Reusing a handler across editor sessions
+
+The editor holds the handler for its lifetime and releases it when it goes, so a handler
+built for a single editor needs no reference of its own. To use the same instance for
+several editors, keep your own reference — the editor drops only its own:
+
+```swift
+final class MediaCoordinator {
+    // Outlives any editor, so every editor can share it.
+    private let uploader = BackgroundUploader(sessionIdentifier: "com.example.media")
+
+    func makeEditor(for blog: Blog, configuration: EditorConfiguration) -> EditorViewController {
+        EditorViewController(configuration: configuration, mediaUploader: uploader)
+    }
+}
+```
+
+This matters most for `MediaUploader`, because the transports it exists for outlive any one
+editor by definition: a background `URLSession` has a fixed identifier and must survive app
+relaunch, and an offline queue spans sessions. Build it once and hand the same instance to
+each editor.
+
+Sharing is also the safer shape. A handler owned by something longer-lived than any editor
+is a leaf, so it cannot form the cycle above and there is nothing to tear down. Two things
+to get right when you share one:
+
+- It may be called concurrently if more than one editor is live — both protocols are
+  `Sendable` for this reason.
+- It must not hold on to any editor it has served, or it reintroduces the cycle for every
+  one of them.
+
+`stopMediaHandling()` is scoped to the editor you call it on. It drops that editor's
+references, so a shared handler keeps working for the others, and an upload already handed
+to a `MediaUploader` continues on your own transport — only that editor's request to the
+local server is cancelled.
+
+On Android the handlers are properties on `GutenbergView` and the cycle does not arise:
+Kotlin's garbage collector traces reachability, and the view tears its server down in
+`onDetachedFromWindow`.
+
 ## Common Patterns
 
 ### Plugin Support

@@ -48,13 +48,20 @@ public enum ProcessedProxyFile: Sendable {
 ///
 /// A processor only changes *bytes* — GutenbergKit still uploads the result to the
 /// configured site and owns the whole lifecycle (retries, cleanup). Because it never
-/// performs the upload itself, it cannot deliver media to the wrong place. Set
-/// ``EditorViewController/mediaProcessor`` to resize images, transcode video,
+/// performs the upload itself, it cannot deliver media to the wrong place. Pass one
+/// as ``EditorViewController/mediaProcessor`` to resize images, transcode video,
 /// strip EXIF, etc.
 ///
 /// This is the safe, common extension point: most hosts want only this. To perform
 /// the upload yourself, conform to ``MediaUploader`` instead.
-public protocol MediaProcessor: AnyObject, Sendable {
+///
+/// Deliberately **not** `AnyObject`-constrained, matching `HTTPRequestHandler` in
+/// `GutenbergKitHTTP`: a `struct` holding the settings it needs — a size limit, a site
+/// URL — is the shape that cannot participate in a reference cycle, and an
+/// `AnyObject` protocol taken at `init` reads like an invitation to pass `self`. A
+/// `final class` conformer is fine too; just keep it a leaf, and see
+/// ``EditorViewController/mediaProcessor`` for what happens when it isn't.
+public protocol MediaProcessor: Sendable {
     /// Whether this processor might transform a file with the given metadata.
     ///
     /// A cheap, metadata-only gate the server consults *before* materializing the
@@ -148,13 +155,17 @@ public struct MediaUpload: Sendable {
 ///
 /// This is a choice of *who executes the requests*, not where they go: an uploader
 /// and GutenbergKit's internal media client both target the same configured site.
-/// Setting ``EditorViewController/mediaUploader`` makes the host own that upload
-/// end-to-end — the request, its own retries, and its recovery and cleanup — with
-/// GutenbergKit out of the network entirely. Because the host does the retries
+/// Passing one as ``EditorViewController/mediaUploader`` makes the host own that
+/// upload end-to-end — the request, its own retries, and its recovery and cleanup —
+/// with GutenbergKit out of the network entirely. Because the host does the retries
 /// itself, there's no raw response left for the editor to retry behind it. The
 /// attachment you return lives on that same configured site, where the editor reads
 /// and updates it by ID.
-public protocol MediaUploader: AnyObject, Sendable {
+///
+/// Not `AnyObject`-constrained, for the reasons on ``MediaProcessor`` — though an
+/// uploader that owns a background session or an offline queue will usually need to be
+/// a class. Keep it a leaf: don't retain the ``EditorViewController`` from it.
+public protocol MediaUploader: Sendable {
     /// Upload a (possibly processed) file and return the finished WordPress
     /// attachment JSON the editor inserts — the same object a direct
     /// `POST /wp/v2/media` returns. Return only once the upload is genuinely done,

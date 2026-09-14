@@ -629,6 +629,43 @@ struct MediaUploadServerTests {
     #expect(weakDelegate == nil)
   }
 
+  @Test("stopping frees a processor that holds the server back")
+  func stopReleasesProcessorThatRetainsTheServer() async throws {
+    // The server-side half of the ownership story, and the one nothing else covers.
+    // `EditorViewController.stopMediaHandling()` clears its own properties *and* stops
+    // the server, because releasing only one leaves the loop routed through the other:
+    // `listener -> newConnectionHandler -> Handler -> processor -> server`.
+    //
+    // That this resolves at all depends on Network.framework behaviour we now rely on:
+    // for a deployment target of iOS 16 or later (this package requires 17), cancelling
+    // an NWListener releases the blocks it captured — rdar://89677097, documented in the
+    // macOS 13 release notes. Before that the blocks were held for the listener's
+    // lifetime and this test would hang at the poll. Pinned here so a regression, or a
+    // lowered deployment target, fails loudly instead of quietly stranding listeners.
+    weak var weakProcessor: ServerRetainingProcessor?
+    var server: MediaUploadServer?
+
+    do {
+      let processor = ServerRetainingProcessor()
+      weakProcessor = processor
+      let started = try await MediaUploadServer.start(processor: processor)
+      processor.server = started  // closes the loop: server -> handler -> processor -> server
+      server = started
+    }
+
+    #expect(weakProcessor != nil, "the server should own the processor while it runs")
+
+    server?.stop()
+    server = nil
+
+    // Polled for the same reason as the test above: `NWListener.cancel()` is
+    // asynchronous, so the release trails `stop()` by a beat.
+    for _ in 0..<100 where weakProcessor != nil {
+      try await Task.sleep(for: .milliseconds(10))
+    }
+    #expect(weakProcessor == nil, "processor leaked — cancelling the listener did not release its blocks")
+  }
+
   @Test("still processes for a delegate the host has dropped its reference to")
   func processesForHostReleasedDelegate() async throws {
     // The processor is read at the admission gate and again at processFile, separated
@@ -1219,5 +1256,17 @@ private struct MockHTTPClient: EditorHTTPClientProtocol {
 private extension Data {
   mutating func append(_ string: String) {
     append(string.data(using: .utf8)!)
+  }
+}
+
+/// Holds the server that owns it, closing `server -> handler -> processor -> server`.
+/// Only `stop()` — which cancels the listener and releases its captured blocks — opens it.
+private final class ServerRetainingProcessor: MediaProcessor, @unchecked Sendable {
+  var server: MediaUploadServer?
+
+  func handlesFile(ofType mimeType: String, named filename: String) -> Bool { false }
+
+  func processFile(at url: URL, mimeType: String, filename: String) async throws -> ProcessedProxyFile {
+    .original
   }
 }
