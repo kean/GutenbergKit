@@ -84,7 +84,6 @@ public final class EditorViewController: UIViewController, GutenbergEditorContro
 
     /// The fetched or provided editor dependencies (settings, assets, preload data).
     private var dependencies: EditorDependencies?
-    private var dependencyTaskHandle: Task<Void, Never>?
 
     /// Error encountered while loading dependencies.
     private var error: Error? {
@@ -319,16 +318,10 @@ public final class EditorViewController: UIViewController, GutenbergEditorContro
             self.loadEditorWithoutDependencies()
         }
 
+        // Deliberately not cancellable — nothing restarts the fetch, and
+        // `viewDidDisappear` fires when the editor is merely covered. See #651.
         if let dependencies {
             // FAST PATH: Dependencies were provided at init() - load immediately.
-            //
-            // Deliberately NOT tracked in `dependencyTaskHandle`: `viewDidDisappear`
-            // cancels that handle to abort the async dependency *fetch*, but the
-            // fast path is cheap local work that must run to completion — a
-            // transient disappearance (e.g. a modal presented over the editor)
-            // cancelling it mid `startUploadServer()` silently disabled native
-            // uploads for the session. `[weak self]` still makes it a no-op once
-            // the controller is torn down.
             Task(priority: .userInitiated) { [weak self] in
                 do {
                     try await self?.loadEditor(dependencies: dependencies)
@@ -338,7 +331,7 @@ public final class EditorViewController: UIViewController, GutenbergEditorContro
             }
         } else {
             // ASYNC FLOW: No dependencies - fetch them asynchronously
-            self.dependencyTaskHandle = Task(priority: .userInitiated) { [weak self] in
+            Task(priority: .userInitiated) { [weak self] in
                 await self?.prepareEditor()
             }
         }
@@ -354,18 +347,13 @@ public final class EditorViewController: UIViewController, GutenbergEditorContro
         removeNavigationOverlay()
     }
 
-    public override func viewDidDisappear(_ animated: Bool) {
-        super.viewDidDisappear(animated)
-        self.dependencyTaskHandle?.cancel()
-    }
-
     /// Releases the editor's media handling: stops the local upload server, drops the
     /// host's ``mediaProcessor`` and ``mediaUploader``, and withdraws the upload
     /// endpoint from the page.
     ///
     /// Most hosts never need this. Releasing the editor runs `deinit`, which does the
-    /// same work. It is only required when the delegate holds the editor back — which
-    /// happens if you conformed the object that owns it, the one shape the delegate
+    /// same work. It is only required when the handler holds the editor back — which
+    /// happens if you conformed the object that owns it, the one shape the handler
     /// documentation asks you to avoid — because that cycle keeps `deinit` from ever
     /// running, stranding a bound loopback `NWListener` for every editor opened.
     ///
@@ -374,7 +362,7 @@ public final class EditorViewController: UIViewController, GutenbergEditorContro
     /// when it is covered, backgrounded, or otherwise coming back. Calling it more than
     /// once is safe.
     ///
-    /// Scoped to this editor. It drops this editor's reference, so a delegate you share
+    /// Scoped to this editor. It drops this editor's reference, so a handler you share
     /// across editors keeps working for the others.
     public func stopMediaHandling() {
         // Host-driven, and the reason is narrower than "UIKit can't tell us". It can.
